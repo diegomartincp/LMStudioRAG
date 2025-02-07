@@ -110,8 +110,8 @@ def query_lm_studio(prompt):
     payload = {
         "model": MODEL_NAME,
         "prompt": prompt,
-        "temperature": 0.7,
-        "max_tokens": 200,
+        "temperature": 0.1,
+        "max_tokens": 1000,
     }
     print(f"Prompt enviado a LM Studio:\n{prompt}")  # Agrega esta línea para depurar
     response = requests.post(LM_STUDIO_API_URL, json=payload)
@@ -145,16 +145,28 @@ def rag_pipeline(user_query):
     if len(indices[0]) == 0 or all(i == -1 for i in indices[0]):
         return "No se encontraron fragmentos relevantes para responder a tu consulta."
 
-    relevant_chunks = [chunks[i] for i in indices[0]]
+    # Filtrar fragmentos relevantes basados en distancia
+    threshold = 2  # Ajusta este valor según sea necesario
+    relevant_chunks = [
+        chunks[i] for i, distance in zip(indices[0], distances[0]) if distance < threshold
+    ]
 
     # Crear el contexto a partir de los fragmentos relevantes (limitado a 1000 caracteres)
-    context = "\n".join([chunk.page_content for chunk in relevant_chunks])[:1000]
+    context = "\n".join([chunk.page_content for chunk in relevant_chunks])[:5000]
 
     if not context.strip():  # Si el contexto está vacío o solo tiene espacios
         return "No se pudo generar un contexto relevante para la consulta."
 
     # Crear el prompt final para el modelo LLM
-    prompt = f"Contexto:\n{context}\n\nPregunta: {user_query}\nRespuesta:"
+    prompt = f"""
+    Por favor, responde a la siguiente pregunta basándote únicamente en la información proporcionada en el contexto.
+
+    Contexto:
+    {context}
+
+    Pregunta: {user_query}
+    Respuesta:
+    """
 
     return query_lm_studio(prompt)
 
