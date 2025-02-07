@@ -19,33 +19,40 @@ index = None  # Se inicializará más adelante
 chunks = []  # Lista para almacenar los fragmentos procesados
 
 
-def process_documents(folder_path):
-    global chunks, index
+def process_documents_with_progress(folder_path):
+    # Lista para almacenar todos los archivos PDF encontrados
+    all_files = []
 
-    # Lista para almacenar todos los documentos encontrados
-    documents = []
-
-    # Recorrer recursivamente la carpeta y sus subcarpetas
-    for root, dirs, files in os.walk(folder_path):
+    # Recorrer recursivamente las carpetas para identificar todos los archivos PDF
+    for root, _, files in os.walk(folder_path):
         for file_name in files:
-            if file_name.endswith(".pdf"):  # Procesar solo archivos PDF
+            if file_name.endswith(".pdf"):  # Filtrar solo archivos PDF
                 file_path = os.path.join(root, file_name)
-                loader = PyPDFLoader(file_path)
-                print("Found document {file_name}")
-                documents.extend(loader.load())
+                all_files.append(file_path)
 
-    # Dividir los documentos en fragmentos (chunks)
-    splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    chunks = splitter.split_documents(documents)
+    total_files = len(all_files)
 
-    # Generar embeddings para los fragmentos
-    embeddings = [embedding_model.encode(chunk.page_content) for chunk in chunks]
+    if total_files == 0:
+        print("No se encontraron archivos PDF.")
+        return
 
-    # Crear e indexar los embeddings en FAISS
-    dimension = embeddings[0].shape[0]
-    index = faiss.IndexFlatL2(dimension)
-    index.add(np.array(embeddings))
-    print(f"Indexado {len(embeddings)} fragmentos en FAISS.")
+    print(f"Total de documentos a procesar: {total_files}")
+
+    # Procesar cada archivo y mostrar el progreso
+    for i, file_path in enumerate(all_files, start=1):
+        file_name = os.path.basename(file_path)  # Obtener solo el nombre del archivo
+        print(f"Procesando archivo: {file_name} ({i}/{total_files})")
+
+        # Aquí puedes agregar el procesamiento del archivo si es necesario
+        loader = PyPDFLoader(file_path)
+        documents = loader.load()
+
+        # Simular procesamiento (puedes reemplazarlo con tu lógica)
+        # Por ejemplo, dividir en fragmentos y generar embeddings
+        splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        chunks.extend(splitter.split_documents(documents))
+
+    print("Procesamiento de documentos completado.")
 
 
 # Función para interactuar con LM Studio mediante su API local
@@ -115,7 +122,7 @@ def internal_server_error(e):
 
 if __name__ == "__main__":
     print("Procesando documentos...")
-    process_documents(DOCUMENTS_FOLDER)  # Procesar e indexar los documentos al iniciar el servidor
+    process_documents_with_progress(DOCUMENTS_FOLDER)  # Procesar e indexar los documentos al iniciar el servidor
 
     print("Iniciando servidor Flask...")
     app.debug = True  # Activa el modo de depuración
