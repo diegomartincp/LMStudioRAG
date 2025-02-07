@@ -12,14 +12,27 @@ import faiss
 DOCUMENTS_FOLDER = "G:/Mi unidad/0. Master pentesting"
 LM_STUDIO_API_URL = "http://localhost:8081/v1/completions"  # URL de la API local de LM Studio
 MODEL_NAME = "deepseek-r1-distill-qwen-7b"  # Cambia esto al nombre del modelo cargado en LM Studio
+INDEX_FILE = "faiss_index.bin"  # Nombre del archivo donde se almacenará el índice
 
 # Inicializar el modelo de embeddings y la base de datos vectorial FAISS
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 index = None  # Se inicializará más adelante
 chunks = []  # Lista para almacenar los fragmentos procesados
 
+def load_or_create_index(folder_path):
+    global index, chunks  # Asegúrate de usar las variables globales
+
+    if os.path.exists(INDEX_FILE):
+        print(f"Cargando índice desde {INDEX_FILE}...")
+        index = faiss.read_index(INDEX_FILE)
+        print("Índice cargado correctamente.")
+    else:
+        print("No se encontró un índice existente. Procesando documentos...")
+        process_documents_with_progress(folder_path)
 
 def process_documents_with_progress(folder_path):
+    global index, chunks  # Asegurarte de usar las variables globales
+
     # Lista para almacenar todos los archivos PDF encontrados
     all_files = []
 
@@ -43,16 +56,37 @@ def process_documents_with_progress(folder_path):
         file_name = os.path.basename(file_path)  # Obtener solo el nombre del archivo
         print(f"Procesando archivo: {file_name} ({i}/{total_files})")
 
-        # Aquí puedes agregar el procesamiento del archivo si es necesario
+        # Cargar el contenido del PDF
         loader = PyPDFLoader(file_path)
         documents = loader.load()
 
-        # Simular procesamiento (puedes reemplazarlo con tu lógica)
-        # Por ejemplo, dividir en fragmentos y generar embeddings
+        # Dividir en fragmentos y agregar al conjunto global de chunks
         splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         chunks.extend(splitter.split_documents(documents))
 
-    print("Procesamiento de documentos completado.")
+    # Generar embeddings para todos los fragmentos procesados
+    print("Generando embeddings...")
+    embeddings = [embedding_model.encode(chunk.page_content) for chunk in chunks]
+
+    # Crear e inicializar el índice FAISS
+    print("Creando índice FAISS...")
+    dimension = embeddings[0].shape[0]  # Dimensión del embedding (debe ser consistente)
+    index = faiss.IndexFlatL2(dimension)  # Crear un índice de tipo L2 (distancia euclidiana)
+    index.add(np.array(embeddings))  # Agregar los embeddings al índice
+
+    print(f"Indexado {len(embeddings)} fragmentos en FAISS.")
+    
+    # Crear e inicializar el índice FAISS
+    print("Creando índice FAISS...")
+    dimension = embeddings[0].shape[0]  # Dimensión del embedding (debe ser consistente)
+    index = faiss.IndexFlatL2(dimension)  # Crear un índice de tipo L2 (distancia euclidiana)
+    index.add(np.array(embeddings))  # Agregar los embeddings al índice
+
+    # Guardar el índice en disco
+    print(f"Guardando el índice en {INDEX_FILE}...")
+    faiss.write_index(index, INDEX_FILE)
+    print(f"Índice guardado correctamente.")
+
 
 
 # Función para interactuar con LM Studio mediante su API local
@@ -122,7 +156,7 @@ def internal_server_error(e):
 
 if __name__ == "__main__":
     print("Procesando documentos...")
-    process_documents_with_progress(DOCUMENTS_FOLDER)  # Procesar e indexar los documentos al iniciar el servidor
+    load_or_create_index(DOCUMENTS_FOLDER)  # Procesar e indexar los documentos al iniciar el servidor
 
     print("Iniciando servidor Flask...")
     app.debug = True  # Activa el modo de depuración
