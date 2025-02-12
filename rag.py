@@ -12,14 +12,15 @@ import pickle
 
 # Configuración inicial
 DOCUMENTS_FOLDER = r"G:/Mi unidad/0. Master pentesting"
-LM_STUDIO_API_URL = "http://localhost:8081/v1/completions"  # URL de la API local de LM Studio
-MODEL_NAME = "deepseek-r1-distill-qwen-7b"  # Cambia esto al nombre del modelo cargado en LM Studio
+LM_STUDIO_API_URL = "http://localhost:1234/v1/chat/completions"  # URL de la API local de LM Studio
+MODEL_NAME = "repository"  # Cambia esto al nombre del modelo cargado en LM Studio
 INDEX_FILE = "faiss_index.bin"  # Nombre del archivo donde se almacenará el índice
 CHUNKS_FILE = "chunks.pkl"  # Archivo donde se guardarán los fragmentos
 
 # Inicializar el modelo de embeddings con soporte para GPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
+embedding_model = SentenceTransformer(r"C:\Users\te03601\Documents\0. Code\all-MiniLM-L6-v2")
+
 print(f"Usando dispositivo: {device}")
 
 index = None  # Se inicializará más adelante
@@ -109,7 +110,10 @@ def load_or_create_index(folder_path):
 def query_lm_studio(prompt):
     payload = {
         "model": MODEL_NAME,
-        "prompt": prompt,
+        "messages": [
+
+            {"role": "user", "content": prompt}
+        ],
         "temperature": 0.1,
         "max_tokens": 1000,
     }
@@ -120,7 +124,8 @@ def query_lm_studio(prompt):
     result = response.json()
     
     if "choices" in result and len(result["choices"]) > 0:
-        return result["choices"][0]["text"]
+        return result["choices"][0]["message"]["content"]
+
 
     raise ValueError("La respuesta no contiene texto válido.")
 

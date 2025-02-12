@@ -1,3 +1,6 @@
+Instalar FAISS
+pip install faiss-cpu --only-binary=:all:
+
 # Sistema RAG (Retrieval-Augmented Generation) con LM Studio y Flask
 
 Este proyecto implementa un sistema **RAG (Retrieval-Augmented Generation)** que permite procesar documentos almacenados localmente (incluyendo subcarpetas) y realizar consultas sobre ellos utilizando un modelo LLM cargado en **LM Studio**.
@@ -22,15 +25,16 @@ Este proyecto implementa un sistema **RAG (Retrieval-Augmented Generation)** que
 ## Instalación
 
 1. Clona este repositorio:
-git clone <URL-del-repositorio>
-cd <nombre-del-repositorio>
+   git clone <URL-del-repositorio>
+   cd <nombre-del-repositorio>
 
 2. Crea un entorno virtual e instálalo:
-python -m venv venv
-source venv/bin/activate # En Windows: venv\Scripts\activate
-pip install -r requirements.txt
+   python -m venv venv
+   source venv/bin/activate # En Windows: venv\Scripts\activate
+   pip install -r requirements.txt
 
 3. Configura LM Studio:
+
 - Descarga e instala LM Studio desde su [página oficial](https://lmstudio.ai).
 - Carga un modelo compatible y habilita la API local.
 
@@ -39,15 +43,15 @@ pip install -r requirements.txt
 ## Uso
 
 1. Coloca tus documentos PDF en una carpeta principal (puede incluir subcarpetas). Configura la ruta en el archivo principal del proyecto:
-DOCUMENTS_FOLDER = r"ruta/a/tu/carpeta"
+   DOCUMENTS_FOLDER = r"ruta/a/tu/carpeta"
 
 2. Ejecuta el servidor Flask:
-python rag.py
+   python rag.py
 
 3. Envía consultas al sistema mediante una herramienta como `curl` o Postman:
-curl -X POST http://localhost:8080/query
--H "Content-Type: application/json"
--d '{"query": "¿Qué dice el documento sobre Kubernetes?"}'
+   curl -X POST http://localhost:8080/query
+   -H "Content-Type: application/json"
+   -d '{"query": "¿Qué dice el documento sobre Kubernetes?"}'
 
 ---
 
