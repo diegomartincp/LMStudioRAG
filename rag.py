@@ -1,8 +1,11 @@
 import os
+import json
+import yaml
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document
 import numpy as np
 import requests
 from flask import Flask, request, jsonify
-from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 import faiss
@@ -11,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pickle
 
 # Configuración inicial
-DOCUMENTS_FOLDER = r"G:/Mi unidad/0. Master pentesting"
+DOCUMENTS_FOLDER = r"./documents"
 LM_STUDIO_API_URL = "http://localhost:1234/v1/chat/completions"  # URL de la API local de LM Studio
 MODEL_NAME = "repository"  # Cambia esto al nombre del modelo cargado en LM Studio
 INDEX_FILE = "faiss_index.bin"  # Nombre del archivo donde se almacenará el índice
@@ -40,8 +43,68 @@ def generate_embeddings_parallel(chunks):
     return embeddings
 
 
+def load_document(file_path):
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == ".pdf":
+        loader = PyPDFLoader(file_path)
+        return loader.load()
+    elif ext == ".json":
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Devuelve como un solo Document para compatibilidad
+        return [Document(page_content=json.dumps(data, indent=2), metadata={"source": file_path})]
+    elif ext in [".yaml", ".yml"]:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        return [Document(page_content=yaml.dump(data, allow_unicode=True), metadata={"source": file_path})]
+    else:
+        raise ValueError(f"Tipo de archivo no soportado: {ext}")
+
 def process_documents_with_progress(folder_path):
     global index, chunks
+
+    all_files = []
+    for root, _, files in os.walk(folder_path):
+        for file_name in files:
+            if file_name.endswith((".pdf", ".json", ".yaml", ".yml")):
+                file_path = os.path.join(root, file_name)
+                all_files.append(file_path)
+
+    total_files = len(all_files)
+    if total_files == 0:
+        print("No se encontraron archivos PDF, JSON ni YAML.")
+        return
+
+    print(f"Total de documentos a procesar: {total_files}")
+
+    for i, file_path in enumerate(all_files, start=1):
+        file_name = os.path.basename(file_path)
+        print(f"Procesando archivo: {file_name} ({i}/{total_files})")
+        try:
+            documents = load_document(file_path)
+            splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+            chunks.extend(splitter.split_documents(documents))
+        except Exception as e:
+            print(f"Error procesando {file_name}: {e}")
+
+    print(f"Total de fragmentos generados: {len(chunks)}")
+    print("Generando embeddings...")
+
+    embeddings = [embedding_model.encode(chunk.page_content) for chunk in chunks]
+
+    print("Creando índice FAISS...")
+    dimension = embeddings[0].shape[0]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(np.array(embeddings))
+
+    print(f"Guardando el índice en {INDEX_FILE}...")
+    faiss.write_index(index, INDEX_FILE)
+
+    print(f"Guardando los fragmentos en {CHUNKS_FILE}...")
+    with open(CHUNKS_FILE, "wb") as f:
+        pickle.dump(chunks, f)
+
+    print("Índice y fragmentos guardados correctamente.")
 
     all_files = []
     for root, _, files in os.walk(folder_path):

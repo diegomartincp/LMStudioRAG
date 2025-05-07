@@ -1,0 +1,379 @@
+---
+swagger: "2.0"
+info:
+  description:
+    "This API allows to retrieve information of customers.\n# Relevant\
+    \ Definitions and concepts\n- **Customer**: Natural Person (individual) or legal\
+    \ entity that has the contract relationship with an OB.\n# API Functionality\n\
+    This API allows to retrieve customer(s) information. This allows to discover information\
+    \ such as customer segment, ways to contact the customer, etc.\n# Resources and\
+    \ Operations overview\nThe API provide a single operation to retrieve the customer\
+    \ information for the customer(s) related with a given user, i.e.: every user\
+    \ is associated/related typically with a Customer (the user is actually the person\
+    \ that has the contract relationship with the OB), but could be associated with\
+    \ several one (e.g.: a user could have both personal assets and enterprise assets,\
+    \ so could be a user related with two different Customers).\nSo, following 4P\
+    \ APIs user centric approach, the Customer(s) information is provided for a given\
+    \ authenticated User requesting it.\n Probably, not every User can access to Customer\
+    \ information, i.e.: access to this information may be restricted for example\
+    \ depending on the activated role.\n# Further Info and Support\nFind answers to\
+    \ Frequently Asked Questions in **https://qna.baikalplatform.com/c/api-faq**.\n\
+    Topics with the **tag 'customer info'** are specific for Customer Information\
+    \ API.\n\n"
+  version: "1.4.0"
+  title: "Customer Information"
+  termsOfService: "https://www.telefonica.es/es/"
+  contact:
+    name: "4th Platform Team"
+    email: "4pf@tid.es"
+host: "api.baikalplatform.com"
+basePath: "/customer-info/v1"
+tags:
+  - name: "customers"
+    description: "Operations to query customer information"
+schemes:
+  - "https"
+consumes:
+  - "application/json"
+produces:
+  - "application/json"
+paths:
+  /users/{user_id}/customers:
+    get:
+      tags:
+        - "customers"
+      summary: "Return customer information for the customer(s) matching a User."
+      description:
+        "Get the customer information for the customer(s) matching a User.\
+        \ Although fields are optional, server MUST implement all the information,\
+        \ except where otherwise noted. Fields are optional to allow filtering the\
+        \ response based on granted scopes to API Client. This way an API Client may\
+        \ be allowed to see all the info but other may only be allowed to see e.g.:\
+        \ id and segment."
+      operationId: "getCustomerInfo"
+      parameters:
+        - name: "user_id"
+          in: "path"
+          description:
+            "id of the user for which the methods apply.\nThis value should\
+            \ be changed to the special keyword 'me' to simplify calls when access using\
+            \ OAuth2 with three-legged authentication."
+          required: true
+          type: "string"
+          x-fp-identifier: "user_id"
+        - name: "x-correlator"
+          in: "header"
+          description: "Correlation id for the different services"
+          required: false
+          type: "string"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/CustomerInfo"
+            minItems: 1
+          examples:
+            application/json:
+              - id: "db8e1f9c-e82f-4c5e-8b2e-26e3e505c641"
+                name: "Juan P?rez P?rez"
+                identity:
+                  first_name: "Juan"
+                  last_name: "P?rez"
+                  additional_last_name: "P?rez"
+                id_document:
+                  country: "ES"
+                  type: "NIF"
+                  value: "6667337566Y"
+                contact_media:
+                  - type: "phone_number"
+                    value: "+34629123456"
+                    favourite: true
+                  - type: "email"
+                    value: "foo@bar.com"
+                    email_most_effective: true
+                segment: "consumer"
+                market_segments:
+                  - id: "RESI"
+                    category: "commercial"
+                    value: "Residencial"
+                    subsegment:
+                      id: "R5"
+                      value: "Fusi?n TV"
+                  - id: "CEN"
+                    category: "Territorial"
+                    value: "Centro"
+                customer_since: "2019-12-02T22:00:00Z"
+                birth_date: "1982-01-09"
+          headers:
+            x-correlator:
+              type: "string"
+              description: "Correlation id for the different services"
+        400:
+          description: "Problem with the client request"
+          examples:
+            application/json:
+              code: "INVALID_ARGUMENT"
+              message:
+                "Client specified an invalid argument, request body or query\
+                \ param"
+          headers:
+            x-correlator:
+              type: "string"
+              description: "Correlation id for the different services"
+        403:
+          description: "Client does not have sufficient permission"
+          examples:
+            application/json:
+              code: "PERMISSION_DENIED"
+              message:
+                "Authenticated user has no permission to access the requested\
+                \ resource"
+          headers:
+            x-correlator:
+              type: "string"
+              description: "Correlation id for the different services"
+        404:
+          description: "Resource not found"
+          examples:
+            application/json:
+              code: "NOT_FOUND"
+              message: "A specified resource is not found"
+          headers:
+            x-correlator:
+              type: "string"
+              description: "Correlation id for the different services"
+        500:
+          description: "Server error"
+          examples:
+            application/json:
+              code: "INTERNAL"
+              message: "Server error"
+          headers:
+            x-correlator:
+              type: "string"
+              description: "Correlation id for the different services"
+        503:
+          description: "Service unavailable. Typically the server is down."
+          examples:
+            application/json:
+              code: "UNAVAILABLE"
+              message: "Service unavailable"
+          headers:
+            x-correlator:
+              type: "string"
+              description: "Correlation id for the different services"
+        504:
+          description:
+            "Request time exceeded. If it happens repeatedly, consider\
+            \ reducing the request complexity"
+          examples:
+            application/json:
+              code: "TIMEOUT"
+              message: "Request timeout exceeded. Try it later"
+          headers:
+            x-correlator:
+              type: "string"
+              description: "Correlation id for the different services"
+      security:
+        - three_legged:
+            - "customer-info-read"
+            - "customer-info-name-read"
+            - "customer-info-identity-read"
+            - "customer-info-id_document-read"
+            - "customer-info-contact_media-read"
+            - "customer-info-segment-read"
+            - "customer-info-market_segments-read"
+            - "customer-info-customer_since-read"
+            - "customer-info-birth_date-read"
+securityDefinitions:
+  three_legged:
+    type: "oauth2"
+    authorizationUrl: "https://auth.baikalplatform.com/authorize"
+    tokenUrl: "https://auth.baikalplatform.com/token"
+    flow: "accessCode"
+    scopes:
+      customer-info-segment-read: "No description available"
+      customer-info-read: "No description available"
+      customer-info-contact_media-read: "No description available"
+      customer-info-customer_since-read: "No description available"
+      customer-info-market_segments-read: "No description available"
+      customer-info-identity-read: "No description available"
+      customer-info-name-read: "No description available"
+      customer-info-birth_date-read: "No description available"
+      customer-info-id_document-read: "No description available"
+definitions:
+  CustomerInfo:
+    type: "object"
+    required:
+      - "id"
+    properties:
+      id:
+        type: "string"
+        description: "Unique identifier of the customer"
+      name:
+        type: "string"
+        description:
+          "The customer full name (could be a company name, if customer\
+          \ is a legal entity."
+      identity:
+        $ref: "#/definitions/Identity"
+      id_document:
+        $ref: "#/definitions/IdDocument"
+      contact_media:
+        type: "array"
+        description: "Array of ways to contact the customer."
+        items:
+          $ref: "#/definitions/ContactMedia"
+      segment:
+        type: "string"
+        description: "Main segment of the Customer."
+        enum:
+          - "consumer"
+          - "corporate"
+      market_segments:
+        type: "array"
+        description:
+          "Market Segments to which the customer belong, according to OB\
+          \ segmentation."
+        items:
+          $ref: "#/definitions/MarketSegment"
+      customer_since:
+        type: "string"
+        format: "date-time"
+        description:
+          "Date from when the user is a customer, in ISO-8601 extended\
+          \ local date format. Time-offset from UTC may be used to match local OB\
+          \ time."
+      birth_date:
+        type: "string"
+        format: "date"
+        description:
+          "Date of birth of the customer, in ISO-8601 extended local date\
+          \ format. This field may not be implemented by the API Server, it depends\
+          \ on whether the OB has this information of the customer."
+    description:
+      "Customer information. NOTE: Although fields are optional, server\
+      \ MUST implement all the information, except where otherwise noted. Fields are\
+      \ optional to allow filtering the response based on granted scopes to API Client.\
+      \ This way an API Client may be allowed to see all the info but other may only\
+      \ be allowed to see e.g.: id and segment."
+  Identity:
+    type: "object"
+    required:
+      - "first_name"
+      - "last_name"
+    properties:
+      first_name:
+        type: "string"
+        description: "First name/given name of the user."
+      last_name:
+        type: "string"
+        description: "Surname/family name of the user."
+      additional_last_name:
+        type: "string"
+        description: "Additional surname/family name of the user."
+    description: "Identity of the user"
+  IdDocument:
+    type: "object"
+    required:
+      - "country"
+      - "type"
+      - "value"
+    properties:
+      country:
+        type: "string"
+        description: "Country of issuance of the id_document. Format iso3166-1 alpha2"
+      type:
+        type: "string"
+        description: "Type of document (e.g. passport, enterprise code)"
+      value:
+        type: "string"
+        description: "Id number associated to the id_document"
+    description: "Customer legal id document information"
+  ContactMedia:
+    type: "object"
+    required:
+      - "type"
+      - "value"
+    properties:
+      type:
+        type: "string"
+        description: "Type of contact."
+        enum:
+          - "phone_number"
+          - "email"
+      phone_contact_mean:
+        type: "string"
+        description:
+          "When the type of contact is 'phone_number', this may indicate\
+          \ if customer wants to be called or texted (SMS)."
+        enum:
+          - "call"
+          - "text"
+      value:
+        type: "string"
+        description:
+          "Value for this contact, i.e.: actual email address or phone-number.\
+          \ For phone-number, E164 with + must be used."
+      favourite:
+        type: "boolean"
+        description: "Flag used to indicate customer favourite contact media"
+      email_most_effective:
+        type: "boolean"
+        description:
+          "It applies for type email. Flag used to indicate customer most\
+          \ effective email"
+      id:
+        type: "string"
+        description:
+          "Unique identifier of the contact_media for this customer. Optionally\
+          \ returned by OBs. It may be used to refer to an existing contact media\
+          \ if required as input in other APIs."
+  MarketSegment:
+    type: "object"
+    required:
+      - "category"
+      - "id"
+      - "value"
+    properties:
+      id:
+        type: "string"
+        description: "Internal id of the market segment for indicated category"
+      category:
+        type: "string"
+        description:
+          "Category of the market segment. E.g.: Market segments could\
+          \ be based on 'level' of the customer (category 'commercial'), or on region\
+          \ of the customer (category 'region')."
+      value:
+        type: "string"
+        description: "The value of the market segment for indicated category"
+      subsegment:
+        $ref: "#/definitions/Subsegment"
+    description: "Market Segment to which the customer belong, according to OB segmentation."
+  Subsegment:
+    type: "object"
+    required:
+      - "id"
+      - "value"
+    properties:
+      value:
+        type: "string"
+        description: "The value of the market subsegment"
+      id:
+        type: "string"
+        description: "Internal id of the market subsegment"
+    description: "Market subsegment"
+parameters:
+  UserId:
+    name: "user_id"
+    in: "path"
+    description:
+      "id of the user for which the methods apply.\nThis value should be\
+      \ changed to the special keyword 'me' to simplify calls when access using OAuth2\
+      \ with three-legged authentication."
+    required: true
+    type: "string"
+    x-fp-identifier: "user_id"
