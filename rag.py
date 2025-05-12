@@ -6,11 +6,15 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
+from langchain_ollama import OllamaEmbeddings
+from langchain_text_splitters import RecursiveJsonSplitter
 
 from sentence_transformers import SentenceTransformer
 import torch
 
 from flask import Flask, request, jsonify
+
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # Configuración inicial
 DOCUMENTS_FOLDER = r"./documents"
@@ -30,8 +34,11 @@ class EmbeddingWrapper:
 
 # Inicializar el modelo de embeddings con soporte para GPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
-embedding_model = SentenceTransformer(r"C:\Users\te03601\Documents\0. Code\all-MiniLM-L6-v2")
-embedding_function = EmbeddingWrapper(lambda x: embedding_model.encode(x, show_progress_bar=False))
+# Puedes especificar el modelo que prefieras
+embeddings = OllamaEmbeddings(
+    model="nomic-embed-text:latest",  # O el modelo de embedding que tengas cargado en el servidor Ollama
+    base_url="http://10.95.118.77:11434"  # Dirección IP y puerto del servidor Ollama remoto
+)
 print(f"Usando dispositivo: {device}")
 
 vectorstore = None  # Se inicializará más adelante
@@ -44,7 +51,14 @@ def load_document(file_path):
     elif ext == ".json":
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return [Document(page_content=json.dumps(data, indent=2), metadata={"source": file_path})]
+            # Mejor: usar RecursiveJsonSplitter para fragmentar el JSON semánticamente
+            splitter = RecursiveJsonSplitter(max_chunk_size=1000)
+            json_chunks = splitter.split_json(data, True)
+            documents = [
+                Document(page_content=json.dumps(chunk, indent=2), metadata={"source": file_path})
+                for chunk in json_chunks
+            ]
+        return documents
     elif ext in [".yaml", ".yml"]:
         with open(file_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
@@ -85,7 +99,7 @@ def process_documents_with_progress(folder_path):
     print("Creando base de datos Chroma...")
     vectorstore = Chroma.from_documents(
         documents=chunks,
-        embedding=embedding_function,
+        embedding=embeddings,
         persist_directory=CHROMA_DIR
     )
     vectorstore.persist()
