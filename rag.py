@@ -1,48 +1,37 @@
 import os
 import json
 import yaml
-
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import RecursiveJsonSplitter
-
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from sentence_transformers import SentenceTransformer
-import torch
-
 from flask import Flask, request, jsonify
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # Configuración inicial
 DOCUMENTS_FOLDER = r"./documents"
-LM_STUDIO_API_URL = "http://10.95.118.77:11434/v1/chat/completions"
+OLLAMA_BASE_URL="http://10.95.118.77:11434"
+MODEL_API_URL = "http://10.95.118.77:11434/v1/chat/completions"
 MODEL_NAME = "llama3.1:8b"
-CHROMA_DIR = "chroma_db"  # Carpeta donde se almacenará la base de datos Chroma
+CHROMA_DIR = "chroma_db"
+EMBEDDING_MODEL="nomic-embed-text:latest"
+MAX_CONTEXT_LENGTH= 5000
+MAX_RESPONSE_TOKENS=1000
 
-class EmbeddingWrapper:
-    def __init__(self, embed_func):
-        self.embed_func = embed_func
-    def embed_documents(self, texts):
-        # Devuelve una lista de vectores para una lista de textos
-        return [self.embed_func(text) for text in texts]
-    def embed_query(self, text):
-        # Devuelve el vector para una sola consulta
-        return self.embed_func(text)
-
-# Inicializar el modelo de embeddings con soporte para GPU
-device = "cuda" if torch.cuda.is_available() else "cpu"
-# Puedes especificar el modelo que prefieras
+# Inicializar el modelo de embedding
 embeddings = OllamaEmbeddings(
-    model="nomic-embed-text:latest",  # O el modelo de embedding que tengas cargado en el servidor Ollama
-    base_url="http://10.95.118.77:11434"  # Dirección IP y puerto del servidor Ollama remoto
+    model=EMBEDDING_MODEL,
+    base_url=OLLAMA_BASE_URL 
 )
-print(f"Usando dispositivo: {device}")
+
 
 vectorstore = None  # Se inicializará más adelante
 
+# Función que carga los documentos en función de su tipo
 def load_document(file_path):
     ext = os.path.splitext(file_path)[1].lower()
     if ext == ".pdf":
@@ -66,6 +55,7 @@ def load_document(file_path):
     else:
         raise ValueError(f"Tipo de archivo no soportado: {ext}")
 
+# Función que procesa los documentos y los almacena en la base de datos
 def process_documents_with_progress(folder_path):
     global vectorstore
     all_files = []
@@ -105,6 +95,7 @@ def process_documents_with_progress(folder_path):
     vectorstore.persist()
     print("Índice y fragmentos guardados correctamente.")
 
+#Función para cargar o crear el índice de la base de datos vectorial
 def load_or_create_index(folder_path):
     global vectorstore
     if os.path.exists(CHROMA_DIR) and os.path.exists(os.path.join(CHROMA_DIR, "chroma-collections.parquet")):
@@ -118,6 +109,7 @@ def load_or_create_index(folder_path):
         print("No se encontró un índice existente. Procesando documentos...")
         process_documents_with_progress(folder_path)
 
+# Función que mnda la query al modelo LLM
 def query_lm_studio(prompt):
     import requests
     payload = {
@@ -126,16 +118,18 @@ def query_lm_studio(prompt):
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.1,
-        "max_tokens": 1000,
+        "max_tokens": MAX_RESPONSE_TOKENS,
     }
-    print(f"Prompt enviado a LM Studio:\n{prompt}")
-    response = requests.post(LM_STUDIO_API_URL, json=payload)
+    print(f"Prompt enviado al modelo LLM:\n{prompt}")
+    response = requests.post(MODEL_API_URL, json=payload)
+    print(f"Response:\n{response}")
     response.raise_for_status()
     result = response.json()
     if "choices" in result and len(result["choices"]) > 0:
         return result["choices"][0]["message"]["content"]
     raise ValueError("La respuesta no contiene texto válido.")
 
+# Función principal que ejecuta el pipeline de RAG y busca coincidenancias en la base de datos para crear el contexto
 def rag_pipeline(user_query):
     global vectorstore
     if vectorstore is None:
@@ -146,21 +140,20 @@ def rag_pipeline(user_query):
     if not relevant_docs:
         return "No se encontraron fragmentos relevantes para responder a tu consulta."
 
-    context = "\n".join([doc.page_content for doc in relevant_docs])[:5000]
+    context = "\n".join([doc.page_content for doc in relevant_docs])[:MAX_CONTEXT_LENGTH]
     if not context.strip():
         return "No se pudo generar un contexto relevante para la consulta."
 
     prompt = f"""
-Por favor, responde a la siguiente pregunta basándote únicamente en la información proporcionada en el contexto.
-Si la respuesta no está en el contexto, responde: "No tengo suficiente información para responder a esta pregunta."
+                Por favor, responde a la siguiente pregunta basándote únicamente en la información proporcionada en el contexto.
+                Si la respuesta no está en el contexto, responde: "No tengo suficiente información para responder a esta pregunta."
 
-Contexto:
-{context}
+                Contexto:
+                {context}
 
-Pregunta: {user_query}
+                Pregunta: {user_query}
 
-Respuesta:
-"""
+            """
     return query_lm_studio(prompt)
 
 app = Flask(__name__)
