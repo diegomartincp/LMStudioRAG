@@ -15,8 +15,8 @@ import pickle
 
 # Configuración inicial
 DOCUMENTS_FOLDER = r"./documents"
-LM_STUDIO_API_URL = "http://localhost:1234/v1/chat/completions"  # URL de la API local de LM Studio
-MODEL_NAME = "repository"  # Cambia esto al nombre del modelo cargado en LM Studio
+LM_STUDIO_API_URL = "http://10.95.118.77:11434/v1/chat/completions"  # URL de la API local de LM Studio
+MODEL_NAME = "llama3.1:8b"  # Cambia esto al nombre del modelo cargado en LM Studio
 INDEX_FILE = "faiss_index.bin"  # Nombre del archivo donde se almacenará el índice
 CHUNKS_FILE = "chunks.pkl"  # Archivo donde se guardarán los fragmentos
 
